@@ -1,0 +1,57 @@
+============================================================
+FEATURE DETECTION REPORT
+============================================================
+
+--- HOLES ---
+  Count: 2
+  [0] pixel=(160, 239)  confidence=0.512
+      radius=41.0px
+      world=[-0.1850, -0.0012, -0.4194]m
+  [1] pixel=(500, 299)  confidence=0.463
+      radius=37.0px
+      world=[0.2152, 0.0706, -0.4029]m
+
+--- SURFACES ---
+  Count: 2
+  [0] pixel=(160, 240)  confidence=0.134
+      area=6680.0px²
+      world=[-0.1854, 0.0000, -0.4183]m
+  [1] pixel=(350, 230)  confidence=0.348
+      area=17381.5px²
+      world=[0.0323, -0.0108, -0.4531]m
+
+--- HANDLES ---
+  Count: 10
+  [0] pixel=(10, 443)  confidence=0.432
+      area=508.5px²
+      world=[-0.8961, 0.5868, 0.3016]m
+  [1] pixel=(38, 410)  confidence=0.352
+      area=281.5px²
+      world=[-0.8149, 0.4912, 0.3012]m
+  [2] pixel=(485, 399)  confidence=0.333
+      area=280.5px²
+      world=[0.4769, 0.4596, 0.3016]m
+  [3] pixel=(301, 392)  confidence=0.303
+      area=318.5px²
+      world=[-0.0550, 0.4398, 0.3029]m
+  [4] pixel=(408, 115)  confidence=0.400
+      area=270.5px²
+      world=[0.2535, -0.3601, 0.2974]m
+  [5] pixel=(563, 109)  confidence=0.370
+      area=301.0px²
+      world=[0.7024, -0.3787, 0.3015]m
+  [6] pixel=(488, 109)  confidence=0.308
+      area=267.0px²
+      world=[0.4845, -0.3778, 0.2989]m
+  [7] pixel=(124, 78)  confidence=0.576
+      area=212.5px²
+      world=[-0.5670, -0.4686, 0.3024]m
+  [8] pixel=(591, 65)  confidence=0.366
+      area=1030.5px²
+      world=[0.7827, -0.5055, 0.3007]m
+  [9] pixel=(534, 22)  confidence=0.400
+      area=206.0px²
+      world=[0.6179, -0.6295, 0.3003]m
+
+Total features detected: 14
+============================================================
