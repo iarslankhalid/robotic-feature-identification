@@ -13,6 +13,10 @@ Pipeline:
 
 import numpy as np
 
+from src.logger import setup_logger
+
+logger = setup_logger(__name__)
+
 
 class CoordinateTransformer:
     """2D pixel → 3D world coordinate mapper."""
@@ -123,4 +127,7 @@ class CoordinateTransformer:
             depth = depth_image[v_clamped, u_clamped]
             world_pt = self.pixel_to_world(u_clamped, v_clamped, depth)
             results.append(world_pt)
+            logger.debug("Pixel (%d,%d) depth=%.3f -> world=[%.4f,%.4f,%.4f]",
+                         u_clamped, v_clamped, depth, world_pt[0], world_pt[1], world_pt[2])
+        logger.debug("batch_pixel_to_world: %d pixels converted", len(results))
         return results

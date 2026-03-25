@@ -12,6 +12,10 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional
 
+from src.logger import setup_logger
+
+logger = setup_logger(__name__)
+
 
 @dataclass
 class DetectedFeature:
@@ -132,6 +136,8 @@ class FeatureDetector:
                     confidence=min(1.0, r / self.cfg["hough_max_radius"]),
                     radius=float(r),
                 ))
+                logger.debug("Hole detected at (%d, %d) r=%d", cx, cy, r)
+        logger.debug("detect_holes: %d holes found", len(features))
         return features
 
     # ------------------------------------------------------------------ #
@@ -189,6 +195,8 @@ class FeatureDetector:
                     area=float(area),
                     contour=cnt,
                 ))
+                logger.debug("Surface detected at (%d, %d) area=%.1f", cx, cy, area)
+        logger.debug("detect_surfaces: %d surfaces found", len(features))
         return features
 
     # ------------------------------------------------------------------ #
@@ -245,6 +253,8 @@ class FeatureDetector:
                     area=float(area),
                     contour=cnt,
                 ))
+                logger.debug("Handle detected at (%d, %d) aspect=%.2f", cx, cy, aspect_ratio)
+        logger.debug("detect_handles: %d handles found", len(features))
         return features
 
     # ------------------------------------------------------------------ #
@@ -258,8 +268,13 @@ class FeatureDetector:
         Returns:
             Dict mapping feature type to list of DetectedFeature.
         """
-        return {
+        logger.info("Running feature detection on image shape=%s", rgb_image.shape)
+        results = {
             "holes": self.detect_holes(rgb_image),
             "surfaces": self.detect_surfaces(rgb_image),
             "handles": self.detect_handles(rgb_image),
         }
+        total = sum(len(v) for v in results.values())
+        logger.info("Detection complete: %d features total (holes=%d surfaces=%d handles=%d)",
+                    total, len(results["holes"]), len(results["surfaces"]), len(results["handles"]))
+        return results

@@ -15,6 +15,10 @@ import pybullet_data
 import numpy as np
 import time
 
+from src.logger import setup_logger
+
+logger = setup_logger(__name__)
+
 
 class SimulationEnvironment:
     """Physics-based simulation environment with tabletop workspace and test objects."""
@@ -38,6 +42,7 @@ class SimulationEnvironment:
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)
         p.setRealTimeSimulation(0)
+        logger.info("Simulation environment initializing (gui=%s)", self.gui)
 
         # Ground plane
         p.loadURDF("plane.urdf")
@@ -52,6 +57,7 @@ class SimulationEnvironment:
         for _ in range(240):
             p.stepSimulation()
 
+        logger.info("Simulation setup complete. Objects: %s", list(self.objects.keys()))
         return self
 
     def _create_table(self):
@@ -104,12 +110,14 @@ class SimulationEnvironment:
             position=[0.0, 0.15, table_z + 0.04]
         )
 
-    def _create_washer(self, position, outer_radius, inner_radius, height):
+    def _create_washer(self, position, outer_radius, inner_radius, height, orientation=None):
         """
         Create a washer-like object (solid cylinder — hole is detected visually).
         PyBullet doesn't support torus shapes natively, so we approximate with a cylinder
         and rely on the vision system to detect the central feature.
         """
+        if orientation is None:
+            orientation = p.getQuaternionFromEuler([0, 0, 0])
         col = p.createCollisionShape(p.GEOM_CYLINDER, radius=outer_radius, height=height)
         vis = p.createVisualShape(
             p.GEOM_CYLINDER,
@@ -122,6 +130,7 @@ class SimulationEnvironment:
             baseCollisionShapeIndex=col,
             baseVisualShapeIndex=vis,
             basePosition=position,
+            baseOrientation=orientation,
         )
         # Store metadata for ground-truth validation
         self.objects.setdefault("_metadata", {})
@@ -132,11 +141,13 @@ class SimulationEnvironment:
         }
         return body
 
-    def _create_mug(self, position):
+    def _create_mug(self, position, orientation=None):
         """
         Create a mug approximated as a cylinder body + a box handle.
         Returns the body ID of the main cylinder.
         """
+        if orientation is None:
+            orientation = p.getQuaternionFromEuler([0, 0, 0])
         mug_radius = 0.03
         mug_height = 0.07
 
@@ -153,6 +164,7 @@ class SimulationEnvironment:
             baseCollisionShapeIndex=col,
             baseVisualShapeIndex=vis,
             basePosition=position,
+            baseOrientation=orientation,
         )
 
         # Handle (small box attached to the side)
@@ -176,6 +188,149 @@ class SimulationEnvironment:
         )
 
         return body
+
+    def spawn_randomized(self, seed: int = None) -> None:
+        """Spawn objects at random positions on the table.
+
+        Args:
+            seed: Optional integer seed for reproducible randomization.
+        """
+        if seed is not None:
+            np.random.seed(seed)
+
+        table_z = 0.42
+
+        # Remove existing objects
+        for name, obj_id in list(self.objects.items()):
+            if name.startswith("_"):
+                continue
+            p.removeBody(obj_id)
+        self.objects.clear()
+
+        # Generate non-overlapping positions
+        positions = []
+        min_sep = 0.1
+        max_attempts = 200
+
+        for _ in range(3):
+            for attempt in range(max_attempts):
+                x = np.random.uniform(-0.25, 0.25)
+                y = np.random.uniform(-0.35, 0.35)
+                candidate = np.array([x, y])
+
+                # Check separation from already-placed objects
+                too_close = False
+                for prev in positions:
+                    if np.linalg.norm(candidate - prev) < min_sep:
+                        too_close = True
+                        break
+
+                if not too_close:
+                    positions.append(candidate)
+                    break
+            else:
+                # Fallback: place without overlap guarantee
+                positions.append(np.array([
+                    np.random.uniform(-0.25, 0.25),
+                    np.random.uniform(-0.35, 0.35),
+                ]))
+
+        yaws = [np.random.uniform(0, 2 * np.pi) for _ in range(3)]
+
+        # --- Washer ---
+        washer_height = 0.006
+        washer_outer_r = 0.03
+        washer_inner_r = 0.012
+        wx, wy = positions[0]
+        w_orn = p.getQuaternionFromEuler([0, 0, yaws[0]])
+        self.objects["washer"] = self._create_washer(
+            position=[wx, wy, table_z + washer_height],
+            outer_radius=washer_outer_r,
+            inner_radius=washer_inner_r,
+            height=washer_height,
+            orientation=w_orn,
+        )
+
+        # --- Box ---
+        box_half = [0.05, 0.035, 0.03]
+        bx, by = positions[1]
+        b_orn = p.getQuaternionFromEuler([0, 0, yaws[1]])
+        box_collision = p.createCollisionShape(p.GEOM_BOX, halfExtents=box_half)
+        box_visual = p.createVisualShape(
+            p.GEOM_BOX, halfExtents=box_half, rgbaColor=[0.2, 0.5, 0.8, 1.0]
+        )
+        self.objects["box"] = p.createMultiBody(
+            baseMass=0.1,
+            baseCollisionShapeIndex=box_collision,
+            baseVisualShapeIndex=box_visual,
+            basePosition=[bx, by, table_z + box_half[2]],
+            baseOrientation=b_orn,
+        )
+
+        # --- Mug ---
+        mx, my = positions[2]
+        m_orn = p.getQuaternionFromEuler([0, 0, yaws[2]])
+        self.objects["mug"] = self._create_mug(
+            position=[mx, my, table_z + 0.04],
+            orientation=m_orn,
+        )
+
+        # Settle
+        for _ in range(500):
+            p.stepSimulation()
+
+        logger.info("spawn_randomized(seed=%s): washer=(%.3f,%.3f) box=(%.3f,%.3f) mug=(%.3f,%.3f)",
+                    seed, positions[0][0], positions[0][1],
+                    positions[1][0], positions[1][1],
+                    positions[2][0], positions[2][1])
+
+    def get_ground_truth(self) -> dict:
+        """Return ground-truth feature locations for all spawned objects.
+
+        Returns:
+            Dict keyed by object name, each containing feature type, world
+            position, and geometry dimensions derived from current physics state.
+        """
+        gt = {}
+
+        # --- Washer ---
+        if "washer" in self.objects:
+            pos, orn = p.getBasePositionAndOrientation(self.objects["washer"])
+            meta = self.objects.get("_metadata", {}).get("washer", {})
+            inner_r = meta.get("hole_radius", 0.012)
+            gt["washer"] = {
+                "type": "hole",
+                "position": list(pos),
+                "feature_radius": inner_r,
+            }
+            logger.debug("GT washer hole at %s r=%.4f", pos, inner_r)
+
+        # --- Box ---
+        if "box" in self.objects:
+            pos, orn = p.getBasePositionAndOrientation(self.objects["box"])
+            box_half_z = 0.03
+            surface_pos = [pos[0], pos[1], pos[2] + box_half_z]
+            gt["box"] = {
+                "type": "surface",
+                "position": surface_pos,
+                "surface_dimensions": [0.10, 0.07],
+            }
+            logger.debug("GT box surface at %s", surface_pos)
+
+        # --- Mug ---
+        if "mug" in self.objects:
+            pos, orn = p.getBasePositionAndOrientation(self.objects["mug"])
+            mug_radius = 0.03
+            handle_half_x = 0.005
+            handle_pos = [pos[0] + mug_radius + handle_half_x, pos[1], pos[2]]
+            gt["mug"] = {
+                "type": "handle",
+                "position": handle_pos,
+                "handle_dimensions": [0.01, 0.03, 0.04],
+            }
+            logger.debug("GT mug handle at %s", handle_pos)
+
+        return gt
 
     def get_object_positions(self):
         """Return current positions of all objects."""
@@ -213,8 +368,8 @@ class SimulationEnvironment:
 if __name__ == "__main__":
     env = SimulationEnvironment(gui=True)
     env.setup()
-    print("Object positions:", env.get_object_positions())
-    print("Simulation running — press Ctrl+C to exit.")
+    logger.info("Object positions: %s", env.get_object_positions())
+    logger.info("Simulation running — press Ctrl+C to exit.")
     try:
         while True:
             env.step()

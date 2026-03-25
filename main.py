@@ -19,6 +19,7 @@ from simulation.environment import SimulationEnvironment
 from src.camera import VirtualCamera
 from src.feature_detector import FeatureDetector
 from src.coordinate_transform import CoordinateTransformer
+from src.logger import setup_logger
 from src.visualization import (
     draw_features_on_image,
     show_rgb_depth_side_by_side,
@@ -26,11 +27,13 @@ from src.visualization import (
     save_detection_report,
 )
 
+logger = setup_logger("main")
+
 
 def run_pipeline(gui=True, save_report=True, show_plots=True):
     """Execute the full perception pipeline."""
 
-    print("[1/5] Setting up simulation environment...")
+    logger.info("[1/5] Setting up simulation environment...")
     env = SimulationEnvironment(gui=gui)
     env.setup()
 
@@ -40,10 +43,10 @@ def run_pipeline(gui=True, save_report=True, show_plots=True):
         if gui:
             time.sleep(1 / 240.0)
 
-    print("  Objects:", list(env.get_object_positions().keys()))
+    logger.info("Objects: %s", list(env.get_object_positions().keys()))
 
     # ------------------------------------------------------------------ #
-    print("[2/5] Configuring virtual camera and capturing RGB-D frame...")
+    logger.info("[2/5] Configuring virtual camera and capturing RGB-D frame...")
     camera = VirtualCamera(
         position=(0.0, -0.5, 0.9),
         target=(0.0, 0.0, 0.42),
@@ -55,20 +58,19 @@ def run_pipeline(gui=True, save_report=True, show_plots=True):
     rgb_image, depth_image = camera.capture()
     cam_params = camera.get_camera_params()
 
-    print(f"  RGB shape:   {rgb_image.shape}")
-    print(f"  Depth shape: {depth_image.shape}")
-    print(f"  Depth range: [{depth_image.min():.3f}, {depth_image.max():.3f}] m")
+    logger.info("RGB shape: %s  Depth range: [%.3f, %.3f] m",
+                rgb_image.shape, depth_image.min(), depth_image.max())
 
     # ------------------------------------------------------------------ #
-    print("[3/5] Running feature detection...")
+    logger.info("[3/5] Running feature detection...")
     detector = FeatureDetector()
     features = detector.detect_all(rgb_image)
 
     for feat_type, feat_list in features.items():
-        print(f"  {feat_type}: {len(feat_list)} detected")
+        logger.info("  %s: %d detected", feat_type, len(feat_list))
 
     # ------------------------------------------------------------------ #
-    print("[4/5] Computing 3D world coordinates...")
+    logger.info("[4/5] Computing 3D world coordinates...")
     transformer = CoordinateTransformer(
         intrinsic_matrix=cam_params["intrinsic_matrix"],
         extrinsic_matrix=cam_params["extrinsic_matrix"],
@@ -81,18 +83,18 @@ def run_pipeline(gui=True, save_report=True, show_plots=True):
             u, v = feat.pixel_coords
             wc = transformer.pixel_to_world(u, v, depth_image[v, u])
             coords.append(wc)
-            print(f"  {feat.feature_type} at pixel ({u}, {v}) → "
-                  f"world [{wc[0]:.4f}, {wc[1]:.4f}, {wc[2]:.4f}]")
+            logger.info("  %s at pixel (%d, %d) → world [%.4f, %.4f, %.4f]",
+                        feat.feature_type, u, v, wc[0], wc[1], wc[2])
         world_coords[feat_type] = coords
 
     # Ground truth comparison
-    print("\n  Ground truth object positions:")
+    logger.info("Ground truth object positions:")
     for name, info in env.get_object_positions().items():
         pos = info["position"]
-        print(f"    {name}: [{pos[0]:.4f}, {pos[1]:.4f}, {pos[2]:.4f}]")
+        logger.info("  %s: [%.4f, %.4f, %.4f]", name, pos[0], pos[1], pos[2])
 
     # ------------------------------------------------------------------ #
-    print("[5/5] Generating visualizations...")
+    logger.info("[5/5] Generating visualizations...")
 
     annotated = draw_features_on_image(rgb_image, features, world_coords)
 
@@ -104,10 +106,10 @@ def run_pipeline(gui=True, save_report=True, show_plots=True):
         show_rgb_depth_side_by_side(rgb_image, depth_image)
         show_detection_results(annotated)
 
-    print("\nPipeline complete.")
+    logger.info("Pipeline complete.")
 
     if gui:
-        print("Simulation still running — press Ctrl+C to exit.")
+        logger.info("Simulation still running — press Ctrl+C to exit.")
         try:
             while True:
                 env.step()

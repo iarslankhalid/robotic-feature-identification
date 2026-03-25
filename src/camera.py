@@ -8,6 +8,10 @@ from the PyBullet simulation environment.
 import pybullet as p
 import numpy as np
 
+from src.logger import setup_logger
+
+logger = setup_logger(__name__)
+
 
 class VirtualCamera:
     """Virtual RGB-D camera using PyBullet's rendering engine."""
@@ -109,6 +113,8 @@ class VirtualCamera:
         )
         depth_image = self._linearize_depth(depth_buffer)
 
+        logger.debug("Captured RGB-D: rgb=%s depth range=[%.3f, %.3f]m",
+                     rgb_image.shape, depth_image.min(), depth_image.max())
         return rgb_image, depth_image
 
     def _linearize_depth(self, depth_buffer):
