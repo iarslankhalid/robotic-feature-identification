@@ -1,0 +1,33 @@
+============================================================
+FEATURE DETECTION REPORT
+============================================================
+
+--- HOLES ---
+  Count: 1
+  [0] pixel=(315, 311)  confidence=0.212
+      radius=17.0px
+      world=[-0.0070, -0.8490, 1.3721]m
+
+--- SURFACES ---
+  Count: 4
+  [0] pixel=(320, 240)  confidence=0.034
+      area=1708.0px²
+      world=[0.0000, -0.9661, 1.3475]m
+  [1] pixel=(603, 174)  confidence=0.012
+      area=604.0px²
+      world=[1.0569, -1.7906, 1.7973]m
+  [2] pixel=(324, 187)  confidence=0.074
+      area=3707.5px²
+      world=[0.0074, -1.1221, 1.3614]m
+  [3] pixel=(303, 33)  confidence=0.207
+      area=10359.5px²
+      world=[-0.1099, -3.3641, 1.7953]m
+
+--- HANDLES ---
+  Count: 1
+  [0] pixel=(319, 239)  confidence=0.462
+      area=1801.0px²
+      world=[-0.0016, -0.9661, 1.3453]m
+
+Total features detected: 6
+============================================================
